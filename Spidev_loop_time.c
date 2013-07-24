@@ -1,0 +1,315 @@
+/*
+ * SPI testing utility (using spidev driver)
+ *
+ * Copyright (c) 2007  MontaVista Software, Inc.
+ * Copyright (c) 2007  Anton Vorontsov <avorontsov@ru.mvista.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License.
+ *
+ * Cross-compile with cross-gcc -I/path/to/cross-kernel/include
+ */
+
+#include <bcm2835.h>
+#include <time.h>
+#include <sys/time.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <getopt.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/types.h>
+#include <linux/spi/spidev.h>
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#define LED_PIN RPI_GPIO_P1_11
+#define NEURON_SIGNAL RPI_GPIO_P1_13
+
+static void pabort(const char *s)
+{
+  perror(s);
+	abort();
+}
+
+static char *device = "/dev/spidev0.0";
+static char *device2 = "/dev/spidev0.1";
+static uint8_t mode;
+static uint8_t bits = 8;
+static uint32_t speed = 32000000;
+static uint16_t delay;
+
+void print_usage(char *prog)
+{
+	printf("Usage: %s [-DsbdlHOLC3]\n", prog);
+	puts("  -D --device   device to use (default /dev/spidev0.0)\n"
+	     "  -s --speed    max speed (Hz)\n"
+	     "  -d --delay    delay (usec)\n"
+	     "  -b --bpw      bits per word \n"
+	     "  -l --loop     loopback\n"
+	     "  -H --cpha     clock phase\n"
+	     "  -O --cpol     clock polarity\n"
+	     "  -L --lsb      least significant bit first\n"
+	     "  -C --cs-high  chip select active high\n"
+	     "  -3 --3wire    SI/SO signals shared\n");
+	exit(1);
+}
+
+void parse_opts(int argc, char *argv[])
+{
+	while (1) {
+		static struct option lopts[] = {
+			{ "device",  1, 0, 'D' },
+			{ "speed",   1, 0, 's' },
+			{ "delay",   1, 0, 'd' },
+			{ "bpw",     1, 0, 'b' },
+			{ "loop",    0, 0, 'l' },
+			{ "cpha",    0, 0, 'H' },
+			{ "cpol",    0, 0, 'O' },
+			{ "lsb",     0, 0, 'L' },
+			{ "cs-high", 0, 0, 'C' },
+			{ "3wire",   0, 0, '3' },
+			{ NULL, 0, 0, 0 },
+		};
+		int c;
+        
+		c = getopt_long(argc, argv, "D:s:d:b:lHOLC3", lopts, NULL);
+        
+		if (c == -1)
+			break;
+        
+		switch (c) {
+            case 'D':
+                device = optarg;
+                break;
+            case 's':
+                speed = atoi(optarg);
+                break;
+            case 'd':
+                delay = atoi(optarg);
+                break;
+            case 'b':
+                bits = atoi(optarg);
+                break;
+            case 'l':
+                mode |= SPI_LOOP;
+                break;
+            case 'H':
+                mode |= SPI_CPHA;
+                break;
+            case 'O':
+                mode |= SPI_CPOL;
+                break;
+            case 'L':
+                mode |= SPI_LSB_FIRST;
+                break;
+            case 'C':
+                mode |= SPI_CS_HIGH;
+                break;
+            case '3':
+                mode |= SPI_3WIRE;
+                break;
+            default:
+                print_usage(argv[0]);
+                break;
+		}
+	}
+}
+
+int main(int argc, char *argv[])
+{
+	FILE *file; //input spidev0_0
+	FILE *file2; //input spidev1_1
+    
+	file = fopen("input0.txt", "a+"); //apend file
+	file2 = fopen("input1.txt", "a+"); 
+    
+	//initialize led gpio interface
+	if (!bcm2835_init())
+		return 1;
+    
+	bcm2835_gpio_fsel(LED_PIN, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(NEURON_SIGNAL, BCM2835_GPIO_FSEL_OUTP);
+
+
+	int fd;
+	int fd2;
+    
+	parse_opts(argc, argv);
+    
+	fd = open(device, O_RDWR);
+	fd2 = open(device2, O_RDWR);
+    
+	/*
+	 * spi mode
+	 */
+	ioctl(fd, SPI_IOC_WR_MODE, &mode);
+	ioctl(fd, SPI_IOC_RD_MODE, &mode);
+    
+	ioctl(fd2, SPI_IOC_WR_MODE, &mode);
+	ioctl(fd2, SPI_IOC_RD_MODE, &mode);
+    
+	/*
+	 * bits per word
+	 */
+	ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits); 
+	ioctl(fd, SPI_IOC_RD_BITS_PER_WORD, &bits);
+    
+	ioctl(fd2, SPI_IOC_WR_BITS_PER_WORD, &bits);
+	ioctl(fd2, SPI_IOC_RD_BITS_PER_WORD, &bits);
+    
+	/*
+	 * max speed hz
+	 */
+	ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
+	ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
+    
+	ioctl(fd2, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
+	ioctl(fd2, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
+    
+	printf("spi mode: %d\n", mode);
+	printf("bits per word: %d\n", bits);
+	printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
+    
+    
+    //Begin Transfer Function
+	int counter = 0;
+	uint16_t rx_buffer[1000];
+	uint16_t rx_buffer2[1000];
+	char str[16];
+    	//transmit data
+    	uint8_t tx[] = {
+        	0xFF, 0xFF,
+        	};
+    	
+    	//initialize receive array
+    	uint8_t rx[ARRAY_SIZE(tx)] = {0, };
+    	uint8_t rx2[ARRAY_SIZE(tx)] = {0, };
+    
+    	//setup transfer object
+    	struct spi_ioc_transfer tr = {
+        	.tx_buf = (unsigned long)tx,
+        	.rx_buf = (unsigned long)rx,
+        	.len = ARRAY_SIZE(tx),
+        	.delay_usecs = delay,
+        	.speed_hz = speed,
+        	.bits_per_word = bits,
+   	 };
+    	
+        struct spi_ioc_transfer tr2 = {
+        	.tx_buf = (unsigned long)tx,
+        	.rx_buf = (unsigned long)rx2,
+        	.len = ARRAY_SIZE(tx),
+        	.delay_usecs = delay,
+        	.speed_hz = speed,
+       		.bits_per_word = bits,
+   	 };
+   	 
+    	//sets timer for the LED
+    	int timer_flag = 0;
+    	//sets timer between input signal pulses
+   	 int input_flag = 0;
+    	//tells whether or not a peak has been detected on one of the channels
+    	int peak_flag1 = 0;
+    	int peak_flag2 = 0;
+    	//counts peaks when both flags are not high
+   	int peak_count1 = 0;
+    	int peak_count2 = 0;
+    	int nSig = 1; //Corresponds to NEURON_SIGNAL
+    	time_t startTime = time(NULL);
+    
+    	bcm2835_gpio_write(NEURON_SIGNAL, HIGH);
+    	
+    	
+    	char timebuffer[30];
+  	struct timeval tv;
+
+  	time_t curtime;
+
+	while(1)
+	{
+		gettimeofday(&tv, NULL); 
+ 		curtime=tv.tv_sec;
+ 		strftime(timebuffer,30,"%m-%d-%Y  %T.",localtime(&curtime));
+ 		printf("%s%ld\n",timebuffer,tv.tv_usec);
+ 	
+        	//send the voltage source to neurons
+        	if((nSig != 1) && (input_flag == 1) && ((time(NULL) - startTime) > 500))
+            		bcm2835_gpio_write(NEURON_SIGNAL, HIGH);
+            		nSig = 1; 
+        	//acquire data from first input 0_0
+        	ioctl(fd, SPI_IOC_MESSAGE(1), &tr); 
+        	/*incoming stream consists of 14 bits, MSB first. 2 setup bits followed by the 12 bit digital input. Following bits are garbage.*/
+        	uint16_t received = ((uint16_t)rx[0] << 8) | (uint16_t)rx[1];
+        	received = received & 0011111111111111;
+        	received = received >> 2;
+		rx_buffer[counter] = received;
+        
+        	//acquire data from second input 1_1 
+        	ioctl(fd2, SPI_IOC_MESSAGE(1), &tr2);
+        	/*incoming stream consists of 14 bits, MSB first. 2 setup bits followed by the 12 bit digital input. Following bits are garbage.*/
+        	uint16_t received2 = ((uint16_t)rx2[0] << 8) | (uint16_t)rx2[1];
+        	received2 = received & 0011111111111111;
+        	received2 = received >> 2;
+		rx_buffer2[counter] = received2;
+        
+        	if((nSig == 1) && (timer_flag == 0)){
+            		if((rx_buffer[counter] > 100) && (peak_flag1 == 0))
+                		peak_flag1 = 1;
+            		else if((rx_buffer[counter] < 100) && (peak_flag1 == 1)){
+                		peak_count1 = peak_count1 + 1; 
+                		peak_flag1 = 0; 
+                	}
+            		if((rx_buffer2[counter] > 100) && (peak_flag2 == 0))
+                		peak_flag2 = 1;
+            		else if(rx_buffer2[counter] < 100 && peak_flag2 == 1){
+                		peak_count2 = peak_count2 + 1;
+                		peak_flag2 = 0; 
+                	}
+                	rx_buffer[counter+1] = 9000 + peak_count1; 
+                	counter = counter + 1; 
+        	}
+           
+	        if(((peak_count1 == 3) /*|| (peak_count2 == 3)*/) && (timer_flag == 0)){
+	           bcm2835_gpio_write(LED_PIN, HIGH);
+	           //fprintf(file, "%s\n", "OH HERRO!!!!!!!");
+	           startTime = time(NULL); //return current time in seconds
+	           timer_flag = 1;
+	        }
+	        
+	        if((timer_flag == 1) && (time(NULL)-startTime > 3)) {
+	           bcm2835_gpio_write(LED_PIN, LOW);
+	           timer_flag = 0;
+	           peak_count1 = 0;
+	           peak_count2 = 0; 
+	           printf("HERROOOOOO!!!!!!!!!!\n"); 
+	           bcm2835_gpio_write(NEURON_SIGNAL, LOW);
+	           nSig = 0; 
+	           startTime = time(NULL);
+	           input_flag = 1;
+	        }
+	
+		counter = counter + 1;
+	       	//dump data from buffer into file
+		if (counter > 1000){
+			int i; 
+			i = 0; 
+			while(i++ < 1000){
+				//fprintf(file, "Count: %d\n", peak_count1); //must move this to be inputted into the array to get realtime data
+	        	        //print 0_0 data into the first file
+				fprintf(file, "%d\n", rx_buffer[i]);
+		                //print 1_1 data into the second file
+	               		fprintf(file2, "%d\n", rx_buffer2[i]);
+	        	        //fwrite(rx_buffer, 16, 1000, file); //for future implementations... slightly faster
+			}
+			counter = 0;
+		}
+		
+    	}
+
+	fclose(file);
+    
+	return 1;
+}
