@@ -10,6 +10,8 @@
  */
 
 #include <bcm2835.h>
+#include <time.h>
+#include <sys/time.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -26,7 +28,7 @@
 
 static void pabort(const char *s)
 {
-  perror(s);
+	perror(s);
 	abort();
 }
 
@@ -133,7 +135,7 @@ int main(int argc, char *argv[])
 	int fd;
 	int fd2;
     
-	parse_opts(argc, argv);
+	//parse_opts(argc, argv);
     
 	fd = open(device, O_RDWR);
 	fd2 = open(device2, O_RDWR);
@@ -217,9 +219,20 @@ int main(int argc, char *argv[])
     	time_t startTime = time(NULL);
     
     	bcm2835_gpio_write(NEURON_SIGNAL, HIGH);
+    	
+    	
+    	char timebuffer[30];
+  	struct timeval tv;
+
+  	time_t curtime;
 
 	while(1)
 	{
+		gettimeofday(&tv, NULL); 
+ 		curtime=tv.tv_sec;
+ 		strftime(timebuffer,30,"%m-%d-%Y  %T.",localtime(&curtime));
+ 		//printf("%s%ld\n",timebuffer,tv.tv_usec);
+ 	
         	//send the voltage source to neurons
         	if((nSig != 1) && (input_flag == 1) && ((time(NULL) - startTime) > 500))
             		bcm2835_gpio_write(NEURON_SIGNAL, HIGH);
@@ -232,12 +245,12 @@ int main(int argc, char *argv[])
         	received = received >> 2;
 		rx_buffer[counter] = received;
         
-        	//acquire data from second input 1_1 
+        	//acquire data from second input 0_1 
         	ioctl(fd2, SPI_IOC_MESSAGE(1), &tr2);
         	/*incoming stream consists of 14 bits, MSB first. 2 setup bits followed by the 12 bit digital input. Following bits are garbage.*/
         	uint16_t received2 = ((uint16_t)rx2[0] << 8) | (uint16_t)rx2[1];
-        	received2 = received & 0011111111111111;
-        	received2 = received >> 2;
+        	received2 = received2 & 0011111111111111;
+        	received2 = received2 >> 2;
 		rx_buffer2[counter] = received2;
         
         	if((nSig == 1) && (timer_flag == 0)){
@@ -269,7 +282,7 @@ int main(int argc, char *argv[])
 	           timer_flag = 0;
 	           peak_count1 = 0;
 	           peak_count2 = 0; 
-	           printf("HERROOOOOO!!!!!!!!!!\n"); 
+	           //printf("HERROOOOOO!!!!!!!!!!\n"); 
 	           bcm2835_gpio_write(NEURON_SIGNAL, LOW);
 	           nSig = 0; 
 	           startTime = time(NULL);
@@ -291,6 +304,7 @@ int main(int argc, char *argv[])
 			}
 			counter = 0;
 		}
+		
     	}
 
 	fclose(file);
