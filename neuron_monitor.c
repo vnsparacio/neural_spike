@@ -127,10 +127,6 @@ int main(int argc, char *argv[])
         .bits_per_word = bits,
     };
     
-    //sets timer for the LED
-    //int timer_flag = 0;
-    //sets timer between input signal pulses
-    //int input_flag = 0;
     //tells whether or not a peak has been detected on one of the channels
     int peak_flag1 = 0;
     int peak_flag2 = 0;
@@ -139,19 +135,12 @@ int main(int argc, char *argv[])
     int peak_count2 = 0;
     int block_counter = 0; //counts the number of blocks
 
-    int led_on = 0; 
+    int led_on = 0; //tells whether or not the LED is on
     
-    char timebuffer[30];
-    char timebuffer2[30];
     struct timeval tv;
     struct timeval tv2;
     
-    time_t curtime;
-    time_t endtime;
-    
     //initialize first block
-    gettimeofday(&tv, NULL);
-    gettimeofday(&tv2, NULL); //continuously sampling time
     rx_buffer[counter] = 9999; //start character
     rx_buffer2[counter] = 9999; //start character
     
@@ -160,11 +149,15 @@ int main(int argc, char *argv[])
     
     counter++;
     
+    gettimeofday(&tv, NULL); //start time
+    gettimeofday(&tv2, NULL); //continuously sampling time
+    
     while(1){
         if(block_counter == 2 && led_on == 1){
             bcm2835_gpio_write(LED_PIN, LOW);
             led_on = 0;
         }
+        
         //reset block counter
         if(block_counter == 20){
             peak_count1 = 0;
@@ -179,22 +172,27 @@ int main(int argc, char *argv[])
             }
         }
         
-        
+        int second_time = tv2_usec;
         //start each individual block
-        if((abs(tv2.tv_usec - tv.tv_usec)) > 500000){
+        if(tv2_sec > tv_sec){
+            second_time = 1000000 + tv2_usec;
+        }
+        
+        if((second_time - tv.tv_usec) > 500000){
             if(nSig == 1){
                 bcm2835_gpio_write(NEURON_SIGNAL, LOW);
                 nSig = 0;
             }
             peak_analysis[block_counter] = peak_count1;
             peak_analysis2[block_counter] = peak_count2;
-            
+        
             gettimeofday(&tv, NULL);
             rx_buffer[counter] = 9999; //start character
             rx_buffer2[counter] = 9999; //start character
             counter++;
             block_counter++;
         }
+
         
         gettimeofday(&tv2, NULL); //continuously sampling time
            
