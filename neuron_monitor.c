@@ -1,5 +1,5 @@
 /*
- * Spidev_beta
+ * neuron_monitor.c
  * STANFORD EE REU 2013
  * Vincent N. Sparacio
  *
@@ -35,7 +35,7 @@ static uint16_t delay;
 int main(int argc, char *argv[])
 {
     FILE *file; //input spidev0_0
-  FILE *file2; //input spidev1_1
+	FILE *file2; //input spidev1_1
     FILE *peaks; //peaks per block
     
 	file = fopen("input0.txt", "a+"); //apend file
@@ -138,7 +138,8 @@ int main(int argc, char *argv[])
     int peak_count1 = 0;
     int peak_count2 = 0;
     int block_counter = 0; //counts the number of blocks
-    time_t startTime = time(NULL);
+
+    int led_on = 0; 
     
     char timebuffer[30];
     char timebuffer2[30];
@@ -160,6 +161,10 @@ int main(int argc, char *argv[])
     counter++;
     
     while(1){
+        if(block_counter == 2 && led_on == 1){
+            bcm2835_gpio_write(LED_PIN, LOW);
+            led_on = 0;
+        }
         //reset block counter
         if(block_counter == 20){
             peak_count1 = 0;
@@ -185,8 +190,8 @@ int main(int argc, char *argv[])
             peak_analysis2[block_counter] = peak_count2;
             
             gettimeofday(&tv, NULL);
-            rx_buffer[counter++] = 9999; //start character
-            rx_buffer2[counter++] = 9999; //start character
+            rx_buffer[counter] = 9999; //start character
+            rx_buffer2[counter] = 9999; //start character
             counter++;
             block_counter++;
         }
@@ -222,8 +227,13 @@ int main(int argc, char *argv[])
             peak_count2++;
             peak_flag2 = 0;
         }
+        
+        if(block_counter == 1 && peak_analysis[block_counter-1] > 5){
+            bcm2835_gpio_write(LED_PIN, HIGH);
+            led_on = 1;
+        }
 
-        counter = counter + 1; //increment to the next index of the arrays
+        counter++; //increment to the next index of the arrays
 
         //dump data from buffer into file
         if (counter > 1000){
