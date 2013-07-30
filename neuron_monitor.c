@@ -96,9 +96,9 @@ int main(int argc, char *argv[])
 	printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
     
     //Begin Transfer Function
-	int counter = 0; //index of buffers
-	uint16_t rx_buffer[buf_size]; //buffer of data for input0
-	uint16_t rx_buffer2[buf_size]; //buffer of data for input1
+    int counter = 0; //index of buffers
+    uint16_t rx_buffer[buf_size]; //buffer of data for input0
+    uint16_t rx_buffer2[buf_size]; //buffer of data for input1
 
     int peak_analysis[NUMBLOCKS]; //buffer for peak analysis of input0
     int peak_analysis2[NUMBLOCKS]; //buffer for peak analysis of input1 
@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
             peak_flag2 = 0;
         }
         
-        if(block_counter == 1 && peak_analysis[block_counter-1] > 5){
+        if(block_counter == 1 && ((peak_analysis[block_counter-1] > 5) || (peak_analysis2[block_counter-1] > 5))){
             bcm2835_gpio_write(LED_PIN, HIGH);
             led_on = 1;
         }
