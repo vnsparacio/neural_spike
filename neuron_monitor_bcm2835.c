@@ -65,14 +65,6 @@ int main(int argc, char *argv[])
     //transmit two bytes of data to received two bytes of data
     char buf[] = { 0x01, 0x02}; // Data to send
 
-    //tells whether or not a peak has been detected on one of the channels
-    int peak_flag1 = 0;
-    int peak_flag2 = 0;
-    //counts peaks when both flags are not high
-    int peak_count1 = 0;
-    int peak_count2 = 0;
-    int block_counter = 0; //counts the number of blocks
-
     int led_on = 0; //tells whether or not the LED is on
 
     struct timeval tv;
