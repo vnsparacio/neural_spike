@@ -1,4 +1,3 @@
-
 /*
  * neuron_monitor.c
  * STANFORD EE REU 2013
@@ -86,6 +85,13 @@ int main(int argc, char *argv[])
     bcm2835_gpio_write(NEURON_SIGNAL, HIGH);
     int nSig = 1;
 
+    //tells whether or not a peak has been detected on one of the channels
+    int peak_flag1 = 0;
+    int peak_flag2 = 0;
+    //counts peaks when both flags are not high
+    int peak_count1 = 0;
+    int peak_count2 = 0;
+    int block_counter = 0; //counts the number of blocks
     counter++;
 
     gettimeofday(&tv, NULL); //start time
